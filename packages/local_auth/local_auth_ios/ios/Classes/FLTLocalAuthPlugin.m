@@ -40,7 +40,7 @@
   } else if ([@"deviceSupportsBiometrics" isEqualToString:call.method]) {
     [self deviceSupportsBiometrics:result];
   } else if ([@"isDeviceSupported" isEqualToString:call.method]) {
-    result(@YES);
+    [self isDeviceSupported:result];
   } else {
     result(FlutterMethodNotImplemented);
   }
@@ -95,6 +95,21 @@
   [[UIApplication sharedApplication].delegate.window.rootViewController presentViewController:alert
                                                                                      animated:YES
                                                                                    completion:nil];
+}
+
+- (void)isDeviceSupported:(FlutterResult)result {
+  LAContext *context = self.createAuthContext;
+  NSError *authError = nil;
+  // Check if authentication with biometrics is possible.
+  if ([context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
+                           error:&authError]) {
+    if (authError == nil) {
+      result(@YES);
+      return;
+    }
+  }
+
+  result(@NO);
 }
 
 - (void)deviceSupportsBiometrics:(FlutterResult)result {
