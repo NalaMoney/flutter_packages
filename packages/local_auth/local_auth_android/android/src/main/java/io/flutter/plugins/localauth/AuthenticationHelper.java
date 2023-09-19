@@ -59,6 +59,9 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
     void onError(String code, String error);
   }
 
+  private static final int BIOMETRIC_RESULT_UNDETERMINED = -1;
+  private static final int BIOMETRIC_RESULT_SUCCESS = 0;
+
   // This is null when not using v2 embedding;
   private final Lifecycle lifecycle;
   private final FragmentActivity activity;
@@ -67,7 +70,11 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
   private final BiometricPrompt.PromptInfo promptInfo;
   private final boolean isAuthSticky;
   private final UiThreadExecutor uiThreadExecutor;
-  private boolean activityPaused = false;
+
+  private boolean activityWasPaused = false;
+  private boolean activityWasResumed = false;
+
+  private int biometricResult = BIOMETRIC_RESULT_UNDETERMINED;
   private BiometricPrompt biometricPrompt;
 
   AuthenticationHelper(
@@ -88,7 +95,6 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
             .setDescription((String) call.argument("localizedReason"))
             .setTitle((String) call.argument("signInTitle"))
             .setSubtitle((String) call.argument("biometricHint"))
-            .setConfirmationRequired((Boolean) call.argument("sensitiveTransaction"))
             .setConfirmationRequired((Boolean) call.argument("sensitiveTransaction"));
 
     int allowedAuthenticators =
@@ -112,8 +118,31 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
     } else {
       activity.getApplication().registerActivityLifecycleCallbacks(this);
     }
+
+    startAuthenticate();
+  }
+
+  private void startAuthenticate() {
+    startAuthenticate(null);
+  }
+
+  private void startAuthenticate(Handler handler) {
+    activityWasPaused = false;
+    activityWasResumed = false;
+
+    biometricResult = BIOMETRIC_RESULT_UNDETERMINED;
+
     biometricPrompt = new BiometricPrompt(activity, uiThreadExecutor, this);
-    biometricPrompt.authenticate(promptInfo);
+    if (handler == null) {
+      biometricPrompt.authenticate(promptInfo);
+    } else {
+      handler.post(new Runnable() {
+        @Override
+        public void run() {
+          biometricPrompt.authenticate(promptInfo);
+        }
+      });
+    }
   }
 
   /** Cancels the biometric authentication. */
@@ -136,12 +165,40 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
   @SuppressLint("SwitchIntDef")
   @Override
   public void onAuthenticationError(int errorCode, CharSequence errString) {
-    switch (errorCode) {
+    handleBiometricPromptResult(errorCode);
+  }
+
+  @Override
+  public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+    handleBiometricPromptResult(BIOMETRIC_RESULT_SUCCESS);
+  }
+
+  private void handleBiometricPromptResult(int result) {
+    biometricResult = result;
+    handleBiometricPromptResultIfPossible();
+  }
+
+  private void handleBiometricPromptResultIfPossible() {
+    final int result = biometricResult;
+    if (result == BIOMETRIC_RESULT_UNDETERMINED) {
+      return;
+    }
+
+    if (result == BiometricPrompt.ERROR_CANCELED && isAuthSticky && activityWasPaused && activityWasResumed) {
+      startAuthenticate(uiThreadExecutor.handler);
+      return;
+    }
+
+    switch (result) {
+      case BIOMETRIC_RESULT_SUCCESS:
+        completionHandler.onSuccess();
+        break;
       case BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL:
         if (call.argument("useErrorDialogs")) {
           showGoToSettingsDialog(
               (String) call.argument("deviceCredentialsRequired"),
               (String) call.argument("deviceCredentialsSetupDescription"));
+          biometricResult = BIOMETRIC_RESULT_UNDETERMINED;
           return;
         }
         completionHandler.onError("NotAvailable", "Security credentials not available.");
@@ -152,6 +209,7 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
           showGoToSettingsDialog(
               (String) call.argument("biometricRequired"),
               (String) call.argument("goToSettingDescription"));
+          biometricResult = BIOMETRIC_RESULT_UNDETERMINED;
           return;
         }
         completionHandler.onError("NotEnrolled", "No Biometrics enrolled on this device.");
@@ -171,23 +229,21 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
             "The operation was canceled because ERROR_LOCKOUT occurred too many times. Biometric authentication is disabled until the user unlocks with strong authentication (PIN/Pattern/Password)");
         break;
       case BiometricPrompt.ERROR_CANCELED:
-        // If we are doing sticky auth and the activity has been paused,
-        // ignore this error. We will start listening again when resumed.
-        if (activityPaused && isAuthSticky) {
+        // If we are doing sticky auth and the activity hasn't been resumed,
+        // ignore this error. We will start another attempt again when resumed.
+        if (!activityWasResumed && isAuthSticky) {
+          // Shouldn't reset biometricResult to BIOMETRIC_RESULT_UNDETERMINED
+          // as we need to keep it for the next time when the activity is resumed.
           return;
-        } else {
-          completionHandler.onFailure();
         }
+        completionHandler.onFailure();
         break;
       default:
         completionHandler.onFailure();
     }
-    stop();
-  }
-
-  @Override
-  public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
-    completionHandler.onSuccess();
+    // We result the biometricResult so that we don't handle the same result twice
+    // unless it's intentionally required (i.e. for stickyAuth purpose)
+    biometricResult = BIOMETRIC_RESULT_UNDETERMINED;
     stop();
   }
 
@@ -200,26 +256,13 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
    */
   @Override
   public void onActivityPaused(Activity ignored) {
-    if (isAuthSticky) {
-      activityPaused = true;
-    }
+    activityWasPaused = true;
   }
 
   @Override
   public void onActivityResumed(Activity ignored) {
-    if (isAuthSticky) {
-      activityPaused = false;
-      final BiometricPrompt prompt = new BiometricPrompt(activity, uiThreadExecutor, this);
-      // When activity is resuming, we cannot show the prompt right away. We need to post it to the
-      // UI queue.
-      uiThreadExecutor.handler.post(
-          new Runnable() {
-            @Override
-            public void run() {
-              prompt.authenticate(promptInfo);
-            }
-          });
-    }
+    activityWasResumed = true;
+    handleBiometricPromptResultIfPossible();
   }
 
   @Override
