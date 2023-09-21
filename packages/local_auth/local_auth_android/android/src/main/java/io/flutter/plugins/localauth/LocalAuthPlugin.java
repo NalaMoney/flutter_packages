@@ -103,7 +103,7 @@ public class LocalAuthPlugin implements MethodCallHandler, FlutterPlugin, Activi
         getEnrolledBiometrics(result);
         break;
       case "isDeviceSupported":
-        isDeviceSupported(result);
+        isDeviceSupported(call, result);
         break;
       case "stopAuthentication":
         stopAuthentication(result);
@@ -139,7 +139,10 @@ public class LocalAuthPlugin implements MethodCallHandler, FlutterPlugin, Activi
       return;
     }
 
-    if (!isDeviceSupported()) {
+    boolean isBiometricOnly = call.argument("biometricOnly");
+    boolean allowCredentials = !isBiometricOnly && canAuthenticateWithDeviceCredential();
+
+    if (!isDeviceSupported(allowCredentials)) {
       authInProgress.set(false);
       result.error("NotAvailable", "Required security features not enabled", null);
       return;
@@ -147,9 +150,6 @@ public class LocalAuthPlugin implements MethodCallHandler, FlutterPlugin, Activi
 
     authInProgress.set(true);
     AuthCompletionHandler completionHandler = createAuthCompletionHandler(result);
-
-    boolean isBiometricOnly = call.argument("biometricOnly");
-    boolean allowCredentials = !isBiometricOnly && canAuthenticateWithDeviceCredential();
 
     sendAuthenticationRequest(call, completionHandler, allowCredentials);
     return;
@@ -259,13 +259,26 @@ public class LocalAuthPlugin implements MethodCallHandler, FlutterPlugin, Activi
   }
 
   @VisibleForTesting
-  public boolean isDeviceSupported() {
-    return isDeviceSecure() || canAuthenticateWithBiometrics();
+  public boolean isDeviceSupported(boolean allowCredentials) {
+    if (allowCredentials && Build.VERSION.SDK_INT < 30) {
+      // Checking for device credential only authentication via the BiometricManager
+      // is not allowed before API level 30, so we check for presence of PIN, pattern,
+      // or password instead.
+      return isDeviceSecure() || canAuthenticate(allowCredentials);
+    }
+
+    return canAuthenticate(allowCredentials);
   }
 
-  private boolean canAuthenticateWithBiometrics() {
+  private boolean canAuthenticate(boolean allowCredentials) {
     if (biometricManager == null) return false;
-    return biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+
+    int allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK;
+    if (allowCredentials) {
+      allowedAuthenticators |= BiometricManager.Authenticators.DEVICE_CREDENTIAL;
+    }
+
+    return biometricManager.canAuthenticate(allowedAuthenticators)
         == BiometricManager.BIOMETRIC_SUCCESS;
   }
 
@@ -289,8 +302,11 @@ public class LocalAuthPlugin implements MethodCallHandler, FlutterPlugin, Activi
         == BiometricManager.BIOMETRIC_SUCCESS;
   }
 
-  private void isDeviceSupported(Result result) {
-    result.success(isDeviceSupported());
+  private void isDeviceSupported(MethodCall call, Result result) {
+    boolean isBiometricOnly = call.argument("biometricOnly");
+    boolean allowCredentials = !isBiometricOnly && canAuthenticateWithDeviceCredential();
+
+    result.success(isDeviceSupported(allowCredentials));
   }
 
   @Override

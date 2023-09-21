@@ -40,7 +40,7 @@
   } else if ([@"deviceSupportsBiometrics" isEqualToString:call.method]) {
     [self deviceSupportsBiometrics:result];
   } else if ([@"isDeviceSupported" isEqualToString:call.method]) {
-    [self isDeviceSupported:result];
+    [self isDeviceSupported:call.arguments withFlutterResult:result];
   } else {
     result(FlutterMethodNotImplemented);
   }
@@ -97,15 +97,28 @@
                                                                                    completion:nil];
 }
 
-- (void)isDeviceSupported:(FlutterResult)result {
+- (void)isDeviceSupported:(NSDictionary *)arguments withFlutterResult:(FlutterResult)result {
+  bool isBiometricOnly = [arguments[@"biometricOnly"] boolValue];
+
   LAContext *context = self.createAuthContext;
   NSError *authError = nil;
-  // Check if authentication with biometrics is possible.
-  if ([context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
-                           error:&authError]) {
-    if (authError == nil) {
-      result(@YES);
-      return;
+
+  if (isBiometricOnly) {
+    // Check if authentication with biometrics is possible.
+    if ([context canEvaluatePolicy:LAPolicyDeviceOwnerAuthenticationWithBiometrics
+                            error:&authError]) {
+      if (authError == nil) {
+        result(@YES);
+        return;
+      }
+    }
+  } else {
+    if ([context canEvaluatePolicy:LAPolicyDeviceOwnerAuthentication
+                            error:&authError]) {
+      if (authError == nil) {
+        result(@YES);
+        return;
+      }
     }
   }
 

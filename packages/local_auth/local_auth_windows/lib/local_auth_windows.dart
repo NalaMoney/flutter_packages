@@ -60,7 +60,16 @@ class LocalAuthWindows extends LocalAuthPlatform {
   }
 
   @override
-  Future<bool> isDeviceSupported() async => _api.isDeviceSupported();
+  Future<bool> isDeviceSupported({
+    AuthenticationOptions options = const AuthenticationOptions(),
+  }) async {
+    if (options.biometricOnly) {
+      throw UnsupportedError(
+          "Windows doesn't support the biometricOnly parameter.");
+    }
+    
+    return _api.isDeviceSupported();
+  }
 
   /// Always returns false as this method is not supported on Windows.
   @override

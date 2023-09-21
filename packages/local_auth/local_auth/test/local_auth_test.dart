@@ -103,8 +103,12 @@ class MockLocalAuthPlatform extends Mock
           as Future<List<BiometricType>>;
 
   @override
-  Future<bool> isDeviceSupported() =>
-      super.noSuchMethod(Invocation.method(#isDeviceSupported, <Object>[]),
+  Future<bool> isDeviceSupported({
+    AuthenticationOptions? options = const AuthenticationOptions(),
+  }) =>
+      super.noSuchMethod(Invocation.method(#isDeviceSupported, <Object>[], <Symbol, Object?>{
+            #options: options,
+          }),
           returnValue: Future<bool>.value(false)) as Future<bool>;
 
   @override

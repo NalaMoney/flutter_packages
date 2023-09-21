@@ -75,8 +75,15 @@ class LocalAuthIOS extends LocalAuthPlatform {
   }
 
   @override
-  Future<bool> isDeviceSupported() async =>
-      (await _channel.invokeMethod<bool>('isDeviceSupported')) ?? false;
+  Future<bool> isDeviceSupported({
+    AuthenticationOptions options = const AuthenticationOptions(),
+  }) async {
+    final Map<String, Object> args = <String, Object>{
+      'biometricOnly': options.biometricOnly,
+    };
+    
+    return (await _channel.invokeMethod<bool>('isDeviceSupported', args)) ?? false;
+  }
 
   /// Always returns false as this method is not supported on iOS.
   @override

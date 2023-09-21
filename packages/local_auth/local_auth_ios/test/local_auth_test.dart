@@ -63,15 +63,56 @@ void main() {
       ]);
     });
 
-    test('isDeviceSupported calls platform', () async {
-      await localAuthentication.isDeviceSupported();
+    group('isDeviceSupported with device auth fail over', () {
+      test('isDeviceSupported with no args', () async {
+        await localAuthentication.isDeviceSupported();
 
-      expect(
-        log,
-        <Matcher>[
-          isMethodCall('isDeviceSupported', arguments: null),
-        ],
-      );
+        expect(
+          log,
+          <Matcher>[
+            isMethodCall(
+              'isDeviceSupported',
+              arguments: arguments: <String, dynamic>{
+                'biometricOnly': false,
+              },
+            ),
+          ],
+        );
+      });
+
+      test('isDeviceSupported with args of biometricOnly true', () async {
+        await localAuthentication.isDeviceSupported(
+          options: const AuthenticationOptions(biometricOnly: true),
+        );
+        expect(
+          log,
+          <Matcher>[
+            isMethodCall(
+              'isDeviceSupported',
+              arguments: arguments: <String, dynamic>{
+                'biometricOnly': true,
+              },
+            ),
+          ],
+        );
+      });
+
+      test('isDeviceSupported with args of biometricOnly false', () async {
+        await localAuthentication.isDeviceSupported(
+          options: const AuthenticationOptions(biometricOnly: false),
+        );
+        expect(
+          log,
+          <Matcher>[
+            isMethodCall(
+              'isDeviceSupported',
+              arguments: arguments: <String, dynamic>{
+                'biometricOnly': false,
+              },
+            ),
+          ],
+        );
+      });
     });
 
     test('stopAuthentication returns false', () async {

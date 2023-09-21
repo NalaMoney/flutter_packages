@@ -20,7 +20,11 @@ dependencies:
   flutter:
     sdk: flutter
   intl: ">=0.17.0 <0.19.0"
-  local_auth_platform_interface: ^1.0.1
+  local_auth_platform_interface:
+    git:
+      url: https://github.com/NalaMoney/flutter_packages
+      path: packages/local_auth/local_auth_platform_interface
+      ref: nala_enhancements_2023_09_21_dev10
 
 dev_dependencies:
   flutter_test:

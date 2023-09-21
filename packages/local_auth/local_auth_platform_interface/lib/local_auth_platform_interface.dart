@@ -85,7 +85,10 @@ abstract class LocalAuthPlatform extends PlatformInterface {
 
   /// Returns true if device is capable of checking biometrics or is able to
   /// fail over to device credentials.
-  Future<bool> isDeviceSupported() async {
+  @override
+  Future<bool> isDeviceSupported({
+    AuthenticationOptions options = const AuthenticationOptions(),
+  }) async {
     throw UnimplementedError('isDeviceSupported() has not been implemented.');
   }
 
