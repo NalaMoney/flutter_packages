@@ -218,8 +218,10 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
         completionHandler.onError("NotEnrolled", "No Biometrics enrolled on this device.");
         break;
       case BiometricPrompt.ERROR_HW_UNAVAILABLE:
+        completionHandler.onError("NotAvailable", "Hardware not available.");
+        break;
       case BiometricPrompt.ERROR_HW_NOT_PRESENT:
-        completionHandler.onError("NotAvailable", "Security credentials not available.");
+        completionHandler.onError("NotAvailable", "Hardware not present.");
         break;
       case BiometricPrompt.ERROR_LOCKOUT:
         completionHandler.onError(
