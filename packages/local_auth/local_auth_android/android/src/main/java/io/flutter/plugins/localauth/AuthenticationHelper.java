@@ -193,6 +193,9 @@ class AuthenticationHelper extends BiometricPrompt.AuthenticationCallback
       case BIOMETRIC_RESULT_SUCCESS:
         completionHandler.onSuccess();
         break;
+      case BiometricPrompt.ERROR_NEGATIVE_BUTTON:
+        // use PIN was pressed
+        return;
       case BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL:
         if (call.argument("useErrorDialogs")) {
           showGoToSettingsDialog(
