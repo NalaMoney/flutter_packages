@@ -26,7 +26,7 @@ dependencies:
     git:
       url: https://github.com/NalaMoney/flutter_packages
       path: packages/local_auth/local_auth_platform_interface
-      ref: nala_enhancements_2023_10_13_dev01
+      ref: nala_enhancements
 
 dev_dependencies:
   flutter_test:
